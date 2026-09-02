@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Karim N Trucking LTD — Invoicing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+  /* ============================================================
+     SETUP — paste the Apps Script Web App URL from
+     karim-invoicing-backend.gs here, then save this file.
+     ============================================================ */
+  const CONFIG = {
+    SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzQQTjUQJup1BNjDqQlGVOYw0WfHdO0JNvWpLI69jX-dg0ePIy_8F9dwUGsM6VueIu5nA/exec'
+  };
+</script>
+<style>
+  :root{
+    --ink:#33326C; --ink-soft:#4A4980; --paper:#F5F4FA; --card:#FFFFFF; --slate:#5B5B7A;
+    --line:#E3E1EF; --line-strong:#D2CFE6; --green:#2E8B57; --green-soft:#E7F4EC;
+    --red:#C0392B; --red-soft:#FBEAE8; --amber:#B8860B; --amber-soft:#FDF6E3;
+    --shadow:0 1px 2px rgba(51,50,108,.08), 0 8px 24px rgba(51,50,108,.08);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--paper); color:var(--ink); font-family:'Barlow',sans-serif; min-height:100vh; -webkit-font-smoothing:antialiased; padding-bottom:40px;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select{font-family:inherit;}
+
+  header.topbar{background:var(--ink); color:#fff; padding:16px 20px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:50; box-shadow:0 2px 12px rgba(0,0,0,.15);}
+  header.topbar .name{font-size:15px;font-weight:800;}
+  header.topbar .tag{font-size:11px;color:#C9C7EA;letter-spacing:.06em;text-transform:uppercase;}
+
+  #apiWarning{display:none;background:#C0392B;color:#fff;text-align:center;font-size:12.5px;font-weight:600;padding:10px 14px;line-height:1.5;}
+  #apiWarning code{background:rgba(255,255,255,.2);padding:1px 5px;border-radius:4px;}
+
+  #app{max-width:900px;margin:0 auto;padding:22px 16px 0;}
+
+  .home-wrap{display:grid;gap:16px;max-width:640px;margin:40px auto;}
+  @media(min-width:640px){.home-wrap{grid-template-columns:1fr 1fr;}}
+  .portal-card{text-align:left;background:var(--card);border:1px solid var(--line-strong);border-radius:16px;padding:24px;box-shadow:var(--shadow);}
+  .portal-card:hover{border-color:var(--ink);}
+  .portal-icon{font-size:28px;margin-bottom:10px;}
+  .portal-title{font-size:17px;font-weight:700;margin-bottom:4px;}
+  .portal-sub{font-size:13.5px;color:var(--slate);}
+
+  .shell-header{display:flex;align-items:center;gap:14px;padding:6px 0 18px;border-bottom:1px solid var(--line);margin-bottom:20px;}
+  .link-btn{background:none;border:none;color:var(--slate);font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:5px;}
+  .link-btn:hover{color:var(--ink);}
+  .link-btn.danger:hover{color:var(--red);}
+  .divider{width:1px;height:18px;background:var(--line-strong);}
+  .shell-title{font-weight:700;}
+  .row-between{display:flex;align-items:center;justify-content:space-between;}
+  .wrap{flex-wrap:wrap;gap:10px;}
+  .flex-row{display:flex;align-items:center;}
+  .gap{gap:8px;}
+  .gap.small{gap:10px;}
+
+  .narrow{max-width:340px;margin:0 auto;}
+  .wide{max-width:820px;margin:0 auto;}
+  .center{text-align:center;padding:40px 0;}
+  .lock-icon{font-size:30px;margin-bottom:10px;}
+  .hint{color:var(--slate);font-size:13.5px;margin-bottom:14px;}
+  .fine-print{font-size:11.5px;color:#8B8AAE;line-height:1.5;}
+  .fine-print.success{color:var(--green);}
+  .muted{color:var(--slate);}
+  .big{font-size:19px;font-weight:700;}
+  .bold{font-weight:700;}
+  .text-right{text-align:right;}
+  .mb{margin-bottom:18px;} .mb-sm{margin-bottom:10px;} .mt{margin-top:16px;} .mt-sm{margin-top:10px;}
+
+  .input{width:100%;border:1.5px solid var(--line-strong);background:var(--card);border-radius:9px;padding:10px 12px;font-size:15px;color:var(--ink);outline:none;}
+  .input:focus{border-color:var(--ink);}
+  .input.auto{width:auto;}
+  .pin-input{text-align:center;font-size:20px;letter-spacing:.3em;}
+  .err-text{color:var(--red);font-size:12px;margin:6px 0;display:none;font-weight:600;}
+
+  .btn-primary{background:var(--ink);color:#fff;border:none;padding:12px 20px;border-radius:10px;font-weight:700;font-size:14.5px;}
+  .btn-primary:hover{background:var(--ink-soft);}
+  .btn-primary:disabled{background:#C9C7DE;cursor:not-allowed;}
+  .btn-primary.full{width:100%;}
+  .btn-outline{background:none;border:1.5px solid var(--line-strong);color:var(--ink-soft);padding:12px 20px;border-radius:10px;font-weight:700;font-size:14.5px;}
+  .btn-success{background:var(--green);color:#fff;border:none;padding:12px 20px;border-radius:10px;font-weight:700;font-size:14.5px;}
+  .btn-success:hover{background:#256e46;}
+  .btn-success:disabled{background:#A9CBB6;cursor:not-allowed;}
+  .btn-ghost-sm{background:var(--card);border:1.5px solid var(--line-strong);border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;color:var(--ink-soft);}
+  .btn-row{display:flex;gap:12px;} .flex1{flex:1;}
+
+  .empty-note{max-width:400px;margin:40px auto;text-align:center;color:var(--slate);font-size:13.5px;}
+
+  .tabs-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  .signed-in{font-size:13.5px;color:var(--slate);}
+  .seg{display:flex;gap:2px;background:var(--card);border:1px solid var(--line-strong);border-radius:9px;padding:3px;}
+  .seg-btn{background:none;border:none;padding:7px 12px;border-radius:7px;font-size:12.5px;font-weight:600;color:var(--slate);}
+  .seg-btn.active{background:var(--ink);color:#fff;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;}
+  @media(max-width:640px){.grid3,.grid4{grid-template-columns:1fr 1fr;}}
+  .field-label{display:block;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--slate);margin-bottom:5px;}
+  .section-label{font-size:14px;font-weight:700;}
+
+  .date-btn{width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1.5px solid var(--line-strong);border-radius:9px;padding:10px 12px;font-size:14px;text-align:left;}
+  .date-btn.small{padding:9px 10px;font-size:13.5px;}
+  .date-btn:hover{border-color:var(--ink);}
+
+  .load-card{background:var(--card);border:1px solid var(--line-strong);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow);}
+  .load-card-footer{border-top:1px solid var(--line);margin-top:10px;padding-top:8px;text-align:right;}
+  .link-btn-danger{background:none;border:none;color:var(--red);font-size:12px;font-weight:600;}
+  .link-btn-sm{background:none;border:none;color:var(--ink-soft);font-size:12px;font-weight:600;}
+  .link-btn-sm.danger{color:var(--red);}
+
+  .ref-tabs{display:flex;gap:6px;margin-bottom:8px;}
+  .ref-tab{flex:1;background:var(--card);border:1.5px solid var(--line-strong);border-radius:8px;padding:7px 4px;font-size:12px;font-weight:700;color:var(--slate);}
+  .ref-tab.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+
+  .dropoffs-list{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
+  .dropoff-row{display:flex;gap:8px;align-items:center;}
+  .dropoff-row .input{flex:1;}
+  .icon-btn{background:none;border:none;color:var(--slate);font-size:14px;padding:4px 6px;}
+  .icon-btn:hover{color:var(--red);}
+  .add-dropoff{display:inline-block;margin-top:2px;}
+
+  .totals-bar{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line-strong);border-radius:12px;padding:14px 16px;margin:14px 0;}
+
+  .table-wrap{overflow-x:auto;border:1px solid var(--line-strong);border-radius:12px;}
+  .data-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .data-table.small{font-size:12px;}
+  .data-table thead{background:#EFEDF9;color:var(--slate);text-transform:uppercase;font-size:11px;}
+  .data-table th,.data-table td{padding:8px 10px;text-align:left;white-space:nowrap;}
+  .data-table tbody tr{border-top:1px solid var(--line);}
+  .right{text-align:right;} .red{color:var(--red);}
+
+  .summary-card{background:var(--card);border:1px solid var(--line-strong);border-radius:12px;padding:16px 18px;}
+  .sum-row{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;}
+  .sum-row.total{border-top:1px solid var(--line);margin-top:6px;padding-top:10px;font-weight:700;font-size:16px;}
+
+  .check-circle{width:56px;height:56px;border-radius:50%;background:var(--green-soft);color:var(--green);font-size:26px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;}
+  .warn{color:var(--amber);font-size:12.5px;background:var(--amber-soft);border-radius:8px;padding:8px 12px;margin:0 auto 16px;max-width:340px;}
+
+  .stack{display:flex;flex-direction:column;gap:10px;}
+  details.invoice-card{background:var(--card);border:1px solid var(--line-strong);border-radius:12px;padding:12px 16px;box-shadow:var(--shadow);}
+  details.invoice-card summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;}
+  details.invoice-card summary::-webkit-details-marker{display:none;}
+  details.invoice-card summary::after{content:'▾';color:var(--slate);margin-left:10px;}
+  details.invoice-card[open] summary::after{content:'▴';}
+
+  .ops-nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:20px;}
+  .nav-tab{background:none;border:none;padding:10px 16px;font-size:13.5px;font-weight:600;color:var(--slate);border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .nav-tab.active{color:var(--ink);border-bottom-color:var(--ink);}
+
+  .driver-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;background:var(--card);border:1px solid var(--line-strong);border-radius:10px;padding:10px 14px;}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+  .dot.green{background:var(--green);} .dot.gray{background:#C9C7DE;}
+  .pin-edit{width:70px;border:1.5px solid var(--line-strong);border-radius:7px;padding:5px 8px;text-align:center;font-size:13px;}
+
+  .divider-h{height:1px;background:var(--line);margin:18px 0;}
+
+  .cal-popover{position:absolute;z-index:200;background:var(--card);border:1px solid var(--line-strong);border-radius:12px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);width:240px;}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;font-size:13.5px;font-weight:700;margin-bottom:8px;}
+  .cal-head button{background:none;border:none;font-size:16px;color:var(--slate);padding:2px 8px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .cal-dow{font-size:10.5px;color:#8B8AAE;text-align:center;margin-bottom:2px;}
+  .cal-day{background:none;border:none;font-size:12.5px;padding:6px 0;border-radius:6px;color:var(--ink);}
+  .cal-day:hover{background:#EFEDF9;}
+  .cal-today{border:1.5px solid var(--ink);}
+  .cal-today-btn{width:100%;margin-top:8px;background:none;border:none;color:var(--ink-soft);font-size:12px;font-weight:700;padding:6px 0;}
+
+  .toast-host{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center;width:100%;padding:0 16px;}
+  .toast{background:var(--ink);color:#fff;padding:11px 18px;border-radius:9px;font-size:13.5px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;transform:translateY(10px);transition:all .2s;max-width:88vw;text-align:center;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.error{background:var(--red);} .toast.success{background:var(--green);}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div>
+    <div class="name">Karim N Trucking LTD</div>
+    <div class="tag">Biweekly Invoicing</div>
+  </div>
+</header>
+
+<div id="apiWarning">
+  Not connected yet. Open this HTML file, find <code>CONFIG.SCRIPT_URL</code> near the top, and paste in your Apps Script Web App URL (see the setup steps in karim-invoicing-backend.gs).
+</div>
+
+<div id="app"></div>
+<div class="toast-host" id="toastHost"></div>
+
+<script>
+(function () {
+
+// ===================== CONSTANTS =====================
+const DEFAULT_COMMISSION_PCT = 20;
+const PROVINCES = [{ code: 'ON', rate: 0.13 }, { code: 'QC', rate: 0.05 }];
+const REF_TYPES = {
+  TL: { label: 'TL#', hint: '9 digits, starts with 9', placeholder: 'e.g. 931052166', pattern: /^9\d{8}$/ },
+  BOL: { label: 'BOL#', hint: '9 digits, starts with 0', placeholder: 'e.g. 085327203', pattern: /^0\d{8}$/ },
+  RM: { label: 'RM#', hint: 'R followed by 8 digits', placeholder: 'e.g. R12345678', pattern: /^R\d{8}$/ },
+  OTHER: { label: 'Other', hint: 'Any reference you have', placeholder: 'e.g. REF-4821', pattern: /^.{1,40}$/ }
+};
+
+// ===================== STATE =====================
+let DATA = { drivers: [], invoices: [], settings: { opsPin: '1234', taxBasis: 'net' } };
+let VIEW = 'home';
+let authedDriver = null;
+let opsAuthed = false;
+let driverTab = 'new';
+let driverStage = 'entry';
+let periodStart = defStart(), periodEnd = defEnd();
+let loads = [emptyLoad()];
+let lastInvoiceResult = null;
+let opsTab = 'invoices';
+let opsInvoiceFilter = 'all';
+let editingTicketNo = null;
+let editingFromOps = false;
+
+// ===================== HELPERS =====================
+function uid(prefix) { return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function generatePin() { return String(Math.floor(1000 + Math.random() * 9000)); }
+function escapeHtml(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function money(n) { const v = isNaN(n) ? 0 : Number(n); return v.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' }); }
+function toISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function fmtDate(iso) { if (!iso) return ''; const d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+function defStart() { const d = new Date(); d.setDate(d.getDate() - 13); return toISO(d); }
+function defEnd() { return toISO(new Date()); }
+function emptyLoad() { return { id: uid('load'), date: '', refType: 'TL', refNumber: '', pickup: '', dropoffs: [''], province: 'ON', price: '' }; }
+
+// Loads an existing invoice back into the driver entry form for editing.
+// Works from either the driver's own "My invoices" tab or the ops
+// "Invoices" tab — fromOps controls where the back button returns to.
+function startEditInvoice(inv, fromOps) {
+  const driver = DATA.drivers.find(d => d.id === inv.driverId);
+  if (!driver) { toast('Could not find this driver\'s record — cannot edit', 'error'); return; }
+  authedDriver = driver;
+  editingTicketNo = inv.id;
+  editingFromOps = !!fromOps;
+  periodStart = inv.periodStart;
+  periodEnd = inv.periodEnd;
+  loads = (inv.loads || []).map(l => {
+    const parts = (l.dropoffsText || '').split(' | ').map(s => s.trim()).filter(Boolean);
+    return {
+      id: uid('load'), date: l.date, refType: l.refType, refNumber: l.refNumber, pickup: l.pickup,
+      dropoffs: parts.length ? parts : [''], province: l.province, price: String(l.price)
+    };
+  });
+  if (loads.length === 0) loads = [emptyLoad()];
+  driverTab = 'new';
+  driverStage = 'entry';
+  VIEW = 'driverApp';
+  render();
+}
+
+// The single "back"/"switch driver" exit point for the driver flow —
+// routes back to ops if the edit was launched from there, otherwise
+// back to the driver login screen as normal.
+function exitDriverFlow() {
+  editingTicketNo = null;
+  authedDriver = null;
+  if (editingFromOps) {
+    editingFromOps = false;
+    VIEW = 'opsApp'; opsTab = 'invoices';
+  } else {
+    VIEW = 'driverLogin';
+  }
+  render();
+}
+
+function wireInvoiceCards(fromOps) {
+  document.querySelectorAll('.edit-invoice-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const inv = DATA.invoices.find(i => i.id === btn.dataset.id);
+      if (inv) startEditInvoice(inv, fromOps);
+    };
+  });
+}
+
+function taxRateFor(province) { const p = PROVINCES.find(p => p.code === province); return p ? p.rate : 0.13; }
+function filterRefInput(type, value) {
+  if (type === 'TL' || type === 'BOL') return value.replace(/\D/g, '').slice(0, 9);
+  if (type === 'RM') {
+    let v = value.toUpperCase().replace(/[^0-9R]/g, '');
+    v = v.startsWith('R') ? 'R' + v.slice(1).replace(/R/g, '') : 'R' + v.replace(/R/g, '');
+    return v.slice(0, 9);
+  }
+  return value.slice(0, 40);
+}
+function calcLoad(l, taxBasis, commissionPct) {
+  const price = parseFloat(l.price) || 0;
+  const rate = ((commissionPct === undefined || commissionPct === null || commissionPct === '') ? 20 : Number(commissionPct)) / 100;
+  const commission = price * rate;
+  const net = price - commission;
+  const taxRate = taxRateFor(l.province);
+  const taxable = taxBasis === 'gross' ? price : net;
+  const tax = taxable * taxRate;
+  return { price, commissionPct: rate * 100, commission, net, rate: taxRate, tax, pay: net + tax };
+}
+function calcTotals(ls, taxBasis, commissionPct) {
+  return ls.reduce((acc, l) => {
+    const c = calcLoad(l, taxBasis, commissionPct);
+    acc.actual += c.price; acc.commission += c.commission; acc.net += c.net; acc.tax += c.tax; acc.pay += c.pay;
+    return acc;
+  }, { actual: 0, commission: 0, net: 0, tax: 0, pay: 0 });
+}
+function loadIsValid(l) {
+  const cfg = REF_TYPES[l.refType];
+  const refOk = cfg && cfg.pattern.test((l.refNumber || '').trim());
+  const dropoffsOk = l.dropoffs.some(d => d.trim());
+  return !!l.date && !!l.pickup.trim() && dropoffsOk && refOk && parseFloat(l.price) > 0;
+}
+function validLoads() { return loads.filter(loadIsValid); }
+function getLoad(id) { return loads.find(l => l.id === id); }
+function driverCommissionPct() { return (authedDriver && authedDriver.commission !== undefined && authedDriver.commission !== '' && authedDriver.commission !== null) ? Number(authedDriver.commission) : DEFAULT_COMMISSION_PCT; }
+
+function toast(msg, kind) {
+  const host = document.getElementById('toastHost');
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 4000);
+}
+
+// ===================== API =====================
+function apiConfigured() { return CONFIG.SCRIPT_URL && CONFIG.SCRIPT_URL.indexOf('PASTE_YOUR') === -1 && CONFIG.SCRIPT_URL.indexOf('https://') === 0; }
+
+// Apps Script cold starts can be slow, but a request should never hang
+// forever with no feedback — cap it and surface a clear error instead.
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 25000);
+  try {
+    const res = await fetch(url, Object.assign({}, options, { signal: controller.signal }));
+    clearTimeout(timer);
+    return res;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError') throw new Error('The request timed out — the backend may be slow to start up. Try again.');
+    throw err;
+  }
+}
+
+async function apiGetAll() { const res = await fetchWithTimeout(CONFIG.SCRIPT_URL, {}, 25000); return res.json(); }
+async function apiPost(payload) {
+  const res = await fetchWithTimeout(CONFIG.SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) }, 25000);
+  return res.json();
+}
+
+// Shared in-flight promise so multiple triggers (e.g. tapping both portal
+// cards before the first load finishes) reuse one request instead of
+// firing duplicate fetches.
+let loadAllPromise = null;
+async function loadAll() {
+  if (!apiConfigured()) return;
+  if (loadAllPromise) return loadAllPromise;
+  loadAllPromise = (async () => {
+    try {
+      const data = await apiGetAll();
+      if (data && data.success) {
+        DATA.drivers = data.drivers || [];
+        DATA.invoices = data.invoices || [];
+        DATA.settings = Object.assign({ opsPin: '1234', taxBasis: 'net' }, data.settings || {});
+      } else if (data && !data.success) {
+        toast(data.message || 'The backend returned an error while loading data', 'error');
+      }
+    } catch (e) {
+      toast(e && e.message ? e.message : 'Could not reach the backend — check CONFIG.SCRIPT_URL and your connection', 'error');
+    } finally {
+      loadAllPromise = null;
+    }
+  })();
+  return loadAllPromise;
+}
+
+// Used when the person clicks into a portal before the initial data load
+// has finished (common on slower mobile connections / Apps Script cold
+// starts) — shows a brief loading state on the button instead of
+// silently opening a portal with stale/empty data. Always restores both
+// portal cards afterward, regardless of which one triggered the load.
+async function ensureDataLoaded(buttonEl) {
+  if (dataLoaded) return;
+  document.querySelectorAll('.portal-card').forEach(card => {
+    const t = card.querySelector('.portal-title');
+    if (t && !t.dataset.original) t.dataset.original = t.textContent;
+    if (t) t.textContent = 'Loading…';
+    card.style.opacity = '0.6';
+    card.style.pointerEvents = 'none';
+  });
+  await loadAll();
+  dataLoaded = true;
+  document.querySelectorAll('.portal-card').forEach(card => {
+    const t = card.querySelector('.portal-title');
+    if (t && t.dataset.original) t.textContent = t.dataset.original;
+    card.style.opacity = '';
+    card.style.pointerEvents = '';
+  });
+}
+
+// Wraps every backend-mutating action (add/update/remove driver, settings)
+// so failures are shown to the person instead of failing silently.
+async function performAction(payload, successMsg) {
+  if (!apiConfigured()) { toast('Backend not connected yet — set CONFIG.SCRIPT_URL near the top of this file', 'error'); return false; }
+  try {
+    const res = await apiPost(payload);
+    if (!res || !res.success) { toast((res && res.message) || 'The backend rejected the request', 'error'); return false; }
+    if (successMsg) toast(successMsg, 'success');
+    return true;
+  } catch (e) {
+    toast('Could not reach the backend — check your connection and the Apps Script deployment', 'error');
+    return false;
+  }
+}
+
+// ===================== CALENDAR POPOVER (shared) =====================
+let activeDateCallback = null;
+let calendarViewDate = new Date();
+const calendarPopover = document.createElement('div');
+calendarPopover.className = 'cal-popover';
+calendarPopover.style.display = 'none';
+document.body.appendChild(calendarPopover);
+
+function openDatePicker(anchorEl, currentValue, onSelect) {
+  activeDateCallback = onSelect;
+  calendarViewDate = currentValue ? new Date(currentValue + 'T00:00:00') : new Date();
+  renderCalendarPopover();
+  const rect = anchorEl.getBoundingClientRect();
+  calendarPopover.style.display = 'block';
+  calendarPopover.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+  calendarPopover.style.left = (window.scrollX + rect.left) + 'px';
+}
+function closeDatePicker() { calendarPopover.style.display = 'none'; activeDateCallback = null; }
+function renderCalendarPopover() {
+  const year = calendarViewDate.getFullYear(), month = calendarViewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = calendarViewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const todayISO = toISO(new Date());
+  let cells = '';
+  for (let i = 0; i < firstDay; i++) cells += '<div></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = toISO(new Date(year, month, d));
+    cells += '<button type="button" class="cal-day ' + (iso === todayISO ? 'cal-today' : '') + '" data-day="' + d + '">' + d + '</button>';
+  }
+  calendarPopover.innerHTML =
+    '<div class="cal-head"><button type="button" id="calPrev">‹</button><div>' + monthLabel + '</div><button type="button" id="calNext">›</button></div>' +
+    '<div class="cal-grid cal-dow"><div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div></div>' +
+    '<div class="cal-grid">' + cells + '</div>' +
+    '<button type="button" id="calToday" class="cal-today-btn">Today</button>';
+  document.getElementById('calPrev').onclick = () => { calendarViewDate = new Date(year, month - 1, 1); renderCalendarPopover(); };
+  document.getElementById('calNext').onclick = () => { calendarViewDate = new Date(year, month + 1, 1); renderCalendarPopover(); };
+  document.getElementById('calToday').onclick = () => { if (activeDateCallback) activeDateCallback(toISO(new Date())); closeDatePicker(); };
+  calendarPopover.querySelectorAll('.cal-day').forEach(btn => {
+    btn.onclick = () => { const d = parseInt(btn.dataset.day, 10); if (activeDateCallback) activeDateCallback(toISO(new Date(year, month, d))); closeDatePicker(); };
+  });
+}
+document.addEventListener('mousedown', e => {
+  if (calendarPopover.style.display === 'block' && !calendarPopover.contains(e.target) && !e.target.closest('.date-btn')) closeDatePicker();
+});
+
+// ===================== RENDER ROOT =====================
+function render() {
+  const app = document.getElementById('app');
+  if (VIEW === 'home') { app.innerHTML = screenHome(); wireHome(); }
+  else if (VIEW === 'driverLogin') { app.innerHTML = screenDriverLogin(); wireDriverLogin(); }
+  else if (VIEW === 'driverApp') { app.innerHTML = screenDriverApp(); wireDriverApp(); }
+  else if (VIEW === 'opsLogin') { app.innerHTML = screenOpsLogin(); wireOpsLogin(); }
+  else if (VIEW === 'opsApp') { app.innerHTML = screenOpsApp(); wireOpsApp(); }
+}
+
+function shell(backId, backLabel, title, bodyHtml) {
+  return '<div class="shell">' +
+    '<header class="shell-header"><button class="link-btn" id="' + backId + '">← ' + backLabel + '</button><div class="divider"></div><div class="shell-title">' + title + '</div></header>' +
+    '<main>' + bodyHtml + '</main></div>';
+}
+
+// ===================== HOME =====================
+function screenHome() {
+  return '<div class="home-wrap">' +
+    '<button class="portal-card" id="goDriver"><div class="portal-icon">🚚</div><div class="portal-title">Driver Portal</div><div class="portal-sub">Log your loads and submit your biweekly invoice.</div></button>' +
+    '<button class="portal-card" id="goOps"><div class="portal-icon">🛡️</div><div class="portal-title">Operations Portal</div><div class="portal-sub">PIN required. Review invoices, manage drivers.</div></button>' +
+    '</div>';
+}
+function wireHome() {
+  document.getElementById('goDriver').onclick = async (e) => { await ensureDataLoaded(e.currentTarget); VIEW = authedDriver ? 'driverApp' : 'driverLogin'; render(); };
+  document.getElementById('goOps').onclick = async (e) => { await ensureDataLoaded(e.currentTarget); VIEW = opsAuthed ? 'opsApp' : 'opsLogin'; render(); };
+}
+
+// ===================== DRIVER LOGIN =====================
+function screenDriverLogin() {
+  const activeDrivers = DATA.drivers.filter(d => d.active !== false);
+  if (activeDrivers.length === 0) {
+    return shell('backHome1', 'Home', 'Driver Portal', '<div class="empty-note">No drivers set up yet. Ask operations to add your name in the Operations Portal, then come back.</div>');
+  }
+  const options = activeDrivers.map(d => '<option value="' + d.id + '">' + escapeHtml(d.name) + '</option>').join('');
+  return shell('backHome1', 'Home', 'Driver Portal', '<div class="narrow center">' +
+    '<div class="lock-icon">🔒</div><div class="hint">Select your name and enter your PIN</div>' +
+    '<select id="driverSelect" class="input mb-sm"><option value="">Select your name</option>' + options + '</select>' +
+    '<input type="password" inputmode="numeric" id="driverPinInput" class="input pin-input mb-sm" placeholder="••••">' +
+    '<div class="err-text" id="driverPinErr">Wrong PIN for that name</div>' +
+    '<button class="btn-primary full" id="driverLoginBtn">Unlock</button>' +
+    '<p class="fine-print mt-sm">Don\'t know your PIN? Ask operations.</p></div>');
+}
+function wireDriverLogin() {
+  document.getElementById('backHome1').onclick = () => { VIEW = 'home'; render(); };
+  const btn = document.getElementById('driverLoginBtn');
+  if (!btn) return;
+  btn.onclick = () => {
+    const id = document.getElementById('driverSelect').value;
+    const pin = document.getElementById('driverPinInput').value;
+    const d = DATA.drivers.find(x => x.id === id);
+    if (d && String(d.pin) === pin) {
+      authedDriver = d; driverTab = 'new'; driverStage = 'entry';
+      periodStart = defStart(); periodEnd = defEnd(); loads = [emptyLoad()];
+      VIEW = 'driverApp'; render();
+    } else {
+      document.getElementById('driverPinErr').style.display = 'block';
+    }
+  };
+}
+
+// ===================== DRIVER APP =====================
+function screenDriverApp() {
+  if (driverStage === 'sent') return screenDriverSent();
+  if (driverStage === 'preview') return screenDriverPreview();
+  const tabsHtml = '<div class="tabs-row"><div class="signed-in">Signed in as <b>' + escapeHtml(authedDriver.name) + '</b></div>' +
+    '<div class="seg"><button class="seg-btn ' + (driverTab === 'new' ? 'active' : '') + '" id="tabNew">Submit invoice</button>' +
+    '<button class="seg-btn ' + (driverTab === 'history' ? 'active' : '') + '" id="tabHistory">My invoices</button></div></div>';
+  const body = driverTab === 'history' ? historyListHtml() : entryFormHtml();
+  return shell('driverBack', 'Switch driver', 'Driver Portal', '<div class="wide">' + tabsHtml + '<div class="mt">' + body + '</div></div>');
+}
+function wireDriverApp() {
+  if (driverStage === 'sent') { wireDriverSent(); return; }
+  if (driverStage === 'preview') { wireDriverPreview(); return; }
+  document.getElementById('driverBack').onclick = () => exitDriverFlow();
+  document.getElementById('tabNew').onclick = () => { driverTab = 'new'; render(); };
+  document.getElementById('tabHistory').onclick = () => { driverTab = 'history'; render(); };
+  if (driverTab === 'history') { wireInvoiceCards(editingFromOps); return; }
+  wireEntryForm();
+}
+
+function entryFormHtml() {
+  return '<div class="grid2 mb">' +
+    '<div><label class="field-label">Period start</label><button type="button" class="date-btn" id="periodStartBtn">' + (fmtDate(periodStart) || 'Select date') + ' 📅</button></div>' +
+    '<div><label class="field-label">Period end</label><button type="button" class="date-btn" id="periodEndBtn">' + (fmtDate(periodEnd) || 'Select date') + ' 📅</button></div></div>' +
+    '<div class="row-between mb-sm"><div class="section-label">Loads</div><button class="btn-ghost-sm" id="addLoadBtn">+ Add load</button></div>' +
+    '<div id="loadsContainer">' + loadsHtml() + '</div>' +
+    '<div class="totals-bar" id="totalsBar">' + totalsBarHtml() + '</div>' +
+    '<button class="btn-primary full" id="previewBtn" ' + (validLoads().length === 0 ? 'disabled' : '') + '>' + (editingTicketNo ? 'Preview changes' : 'Preview invoice') + '</button>';
+}
+function loadsHtml() { return loads.map(loadCardHtml).join(''); }
+function loadCardHtml(l) {
+  const cfg = REF_TYPES[l.refType];
+  const dropoffsHtml = l.dropoffs.map((d, idx) =>
+    '<div class="dropoff-row"><input type="text" class="input dropoff-input" data-load="' + l.id + '" data-idx="' + idx + '" placeholder="e.g. Montreal DC" value="' + escapeHtml(d) + '">' +
+    (l.dropoffs.length > 1 ? '<button type="button" class="icon-btn remove-dropoff" data-load="' + l.id + '" data-idx="' + idx + '">✕</button>' : '') + '</div>'
+  ).join('');
+  const refTabs = Object.keys(REF_TYPES).map(k =>
+    '<button type="button" class="ref-tab ' + (l.refType === k ? 'active' : '') + '" data-load="' + l.id + '" data-reftype="' + k + '">' + REF_TYPES[k].label + '</button>'
+  ).join('');
+  return '<div class="load-card">' +
+    '<div class="grid4">' +
+    '<div><label class="field-label">Date</label><button type="button" class="date-btn small load-date-btn" data-load="' + l.id + '">' + (fmtDate(l.date) || 'Select date') + ' 📅</button></div>' +
+    '<div><label class="field-label">Pickup</label><input type="text" class="input pickup-input" data-load="' + l.id + '" placeholder="e.g. IPEX Ajax" value="' + escapeHtml(l.pickup) + '"></div>' +
+    '<div><label class="field-label">Destination (tax)</label><select class="input province-select" data-load="' + l.id + '">' +
+      PROVINCES.map(p => '<option value="' + p.code + '" ' + (l.province === p.code ? 'selected' : '') + '>' + p.code + '</option>').join('') + '</select></div>' +
+    '<div><label class="field-label">Price ($)</label><input type="number" min="0" step="0.01" class="input price-input" data-load="' + l.id + '" placeholder="0.00" value="' + escapeHtml(l.price) + '"></div>' +
+    '</div>' +
+    '<div class="mt-sm"><label class="field-label">Reference number</label><div class="ref-tabs">' + refTabs + '</div>' +
+    '<input type="text" class="input mono refnumber-input" data-load="' + l.id + '" placeholder="' + cfg.placeholder + '" value="' + escapeHtml(l.refNumber) + '">' +
+    '<div class="fine-print">' + cfg.hint + '</div></div>' +
+    '<div class="mt-sm"><label class="field-label">Drop-off location(s)</label><div class="dropoffs-list">' + dropoffsHtml + '</div>' +
+    '<button type="button" class="link-btn-sm add-dropoff" data-load="' + l.id + '">+ Add another drop-off</button></div>' +
+    (loads.length > 1 ? '<div class="load-card-footer"><button type="button" class="link-btn-danger remove-load" data-load="' + l.id + '">🗑 Remove this load</button></div>' : '') +
+    '</div>';
+}
+function totalsBarHtml() {
+  const t = calcTotals(validLoads(), DATA.settings.taxBasis, driverCommissionPct());
+  const n = validLoads().length;
+  return '<div class="muted">' + n + ' load' + (n !== 1 ? 's' : '') + ' ready</div>' +
+    '<div class="text-right"><div class="fine-print">Estimated pay</div><div class="big">' + money(t.pay) + '</div></div>';
+}
+function updateTotalsDisplay() { const el = document.getElementById('totalsBar'); if (el) el.innerHTML = totalsBarHtml(); }
+function updatePreviewButtonState() { const b = document.getElementById('previewBtn'); if (b) b.disabled = validLoads().length === 0; }
+
+function rebuildLoadsContainer() {
+  document.getElementById('loadsContainer').innerHTML = loadsHtml();
+  wireLoadsContainer();
+  updateTotalsDisplay();
+  updatePreviewButtonState();
+}
+function wireEntryForm() {
+  document.getElementById('periodStartBtn').onclick = (e) => openDatePicker(e.target, periodStart, v => { periodStart = v; document.getElementById('periodStartBtn').textContent = fmtDate(v) + ' 📅'; });
+  document.getElementById('periodEndBtn').onclick = (e) => openDatePicker(e.target, periodEnd, v => { periodEnd = v; document.getElementById('periodEndBtn').textContent = fmtDate(v) + ' 📅'; });
+  document.getElementById('addLoadBtn').onclick = () => { loads.push(emptyLoad()); rebuildLoadsContainer(); };
+  document.getElementById('previewBtn').onclick = () => { if (validLoads().length === 0) return; driverStage = 'preview'; render(); };
+  wireLoadsContainer();
+}
+function wireLoadsContainer() {
+  const c = document.getElementById('loadsContainer');
+  c.querySelectorAll('.pickup-input').forEach(inp => { inp.oninput = () => { getLoad(inp.dataset.load).pickup = inp.value; updateTotalsDisplay(); updatePreviewButtonState(); }; });
+  c.querySelectorAll('.price-input').forEach(inp => { inp.oninput = () => { getLoad(inp.dataset.load).price = inp.value; updateTotalsDisplay(); updatePreviewButtonState(); }; });
+  c.querySelectorAll('.refnumber-input').forEach(inp => {
+    inp.oninput = () => { const l = getLoad(inp.dataset.load); l.refNumber = filterRefInput(l.refType, inp.value); if (inp.value !== l.refNumber) inp.value = l.refNumber; updatePreviewButtonState(); };
+  });
+  c.querySelectorAll('.province-select').forEach(sel => { sel.onchange = () => { getLoad(sel.dataset.load).province = sel.value; updateTotalsDisplay(); }; });
+  c.querySelectorAll('.dropoff-input').forEach(inp => { inp.oninput = () => { getLoad(inp.dataset.load).dropoffs[Number(inp.dataset.idx)] = inp.value; updateTotalsDisplay(); updatePreviewButtonState(); }; });
+  c.querySelectorAll('.remove-dropoff').forEach(btn => { btn.onclick = () => { const l = getLoad(btn.dataset.load); l.dropoffs.splice(Number(btn.dataset.idx), 1); if (l.dropoffs.length === 0) l.dropoffs = ['']; rebuildLoadsContainer(); }; });
+  c.querySelectorAll('.add-dropoff').forEach(btn => { btn.onclick = () => { getLoad(btn.dataset.load).dropoffs.push(''); rebuildLoadsContainer(); }; });
+  c.querySelectorAll('.ref-tab').forEach(btn => { btn.onclick = () => { const l = getLoad(btn.dataset.load); l.refType = btn.dataset.reftype; l.refNumber = ''; rebuildLoadsContainer(); }; });
+  c.querySelectorAll('.remove-load').forEach(btn => { btn.onclick = () => { loads = loads.filter(l => l.id !== btn.dataset.load); if (loads.length === 0) loads = [emptyLoad()]; rebuildLoadsContainer(); }; });
+  c.querySelectorAll('.load-date-btn').forEach(btn => {
+    btn.onclick = (e) => { const l = getLoad(btn.dataset.load); openDatePicker(e.target, l.date, v => { l.date = v; btn.textContent = fmtDate(v) + ' 📅'; }); };
+  });
+}
+
+// ===================== DRIVER PREVIEW / SENT =====================
+function screenDriverPreview() {
+  const t = calcTotals(validLoads(), DATA.settings.taxBasis, driverCommissionPct());
+  const rows = validLoads().map(l => {
+    const c = calcLoad(l, DATA.settings.taxBasis, driverCommissionPct());
+    const dtext = l.dropoffs.filter(d => d.trim()).join(' | ');
+    return '<tr><td>' + l.date + '</td><td class="mono">' + l.refType + '#' + l.refNumber + '</td><td>' + escapeHtml(l.pickup) + '</td><td>' + escapeHtml(dtext) + '</td><td>' + l.province + '</td>' +
+      '<td class="right">' + money(c.price) + '</td><td class="right red">-' + money(c.commission) + '</td><td class="right">+' + money(c.tax) + '</td><td class="right bold">' + money(c.pay) + '</td></tr>';
+  }).join('');
+  return shell('previewBack', 'Edit loads', 'Preview invoice', '<div class="wide">' +
+    '<div class="row-between mb"><div><div class="fine-print">Driver</div><div class="big">' + escapeHtml(authedDriver.name) + '</div>' + (authedDriver.company ? '<div class="fine-print">' + escapeHtml(authedDriver.company) + '</div>' : '') + '</div>' +
+    '<div class="text-right"><div class="fine-print">Period</div><div>' + periodStart + ' — ' + periodEnd + '</div></div></div>' +
+    '<div class="table-wrap mb"><table class="data-table"><thead><tr><th>Date</th><th>Ref</th><th>Pickup</th><th>Drop-off(s)</th><th>Prov</th><th class="right">Actual</th><th class="right">Commission</th><th class="right">Tax</th><th class="right">Pay</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<div class="summary-card mb">' +
+    '<div class="sum-row"><span>Actual amount (total)</span><span>' + money(t.actual) + '</span></div>' +
+    '<div class="sum-row muted"><span>' + driverCommissionPct() + '% commission</span><span>-' + money(t.commission) + '</span></div>' +
+    '<div class="sum-row"><span>Net after commission</span><span>' + money(t.net) + '</span></div>' +
+    '<div class="sum-row muted"><span>Tax</span><span>+' + money(t.tax) + '</span></div>' +
+    '<div class="sum-row total"><span>Your pay</span><span>' + money(t.pay) + '</span></div></div>' +
+    '<p class="fine-print mb">By approving, you confirm these loads and amounts are correct. This will be sent to operations and logged.</p>' +
+    '<div class="btn-row"><button class="btn-outline flex1" id="previewBack2">Back &amp; edit</button><button class="btn-success flex1" id="approveBtn">' + (editingTicketNo ? 'Save changes' : 'Approve &amp; submit') + '</button></div></div>');
+}
+function wireDriverPreview() {
+  document.getElementById('previewBack').onclick = () => { driverStage = 'entry'; render(); };
+  document.getElementById('previewBack2').onclick = () => { driverStage = 'entry'; render(); };
+  document.getElementById('approveBtn').onclick = handleApprove;
+}
+async function handleApprove() {
+  const btn = document.getElementById('approveBtn');
+  const isEdit = !!editingTicketNo;
+  if (btn) { btn.disabled = true; btn.textContent = isEdit ? 'Saving…' : 'Sending…'; }
+  const enriched = validLoads().map(l => Object.assign({}, l, { dropoffsText: l.dropoffs.filter(d => d.trim()).join(' | ') }, calcLoad(l, DATA.settings.taxBasis, driverCommissionPct())));
+  const totals = calcTotals(validLoads(), DATA.settings.taxBasis, driverCommissionPct());
+  const payload = {
+    action: isEdit ? 'updateInvoice' : 'submitInvoice', ticketNo: isEdit ? editingTicketNo : uid('inv'),
+    driverId: authedDriver.id, driverName: authedDriver.name,
+    driverEmail: authedDriver.email || '', driverCompany: authedDriver.company || '',
+    periodStart: periodStart, periodEnd: periodEnd, taxBasis: DATA.settings.taxBasis, submittedAt: new Date().toISOString(), totals: totals,
+    loads: enriched.map(l => ({ date: l.date, refType: l.refType, refNumber: l.refNumber, pickup: l.pickup, dropoffs: l.dropoffsText, province: l.province, price: l.price, commissionPct: l.commissionPct, commission: l.commission, net: l.net, taxRate: l.rate, tax: l.tax, pay: l.pay }))
+  };
+  let result = { success: false, emailSent: false, error: '', invoiceNumber: '', wasEdit: isEdit };
+  try {
+    const res = await apiPost(payload);
+    result.success = !!res.success;
+    result.emailSent = !!res.emailSent;
+    result.invoiceNumber = res.invoiceNumber || '';
+    if (!res.success) result.error = res.message || 'The backend rejected the submission.';
+    else if (!res.emailSent) result.error = res.emailError || 'Saved, but the email could not be sent.';
+  } catch (e) {
+    result.error = 'Could not reach the backend. Check the Apps Script URL and your connection — ask operations to confirm whether this invoice was saved.';
+  }
+  lastInvoiceResult = result;
+  editingTicketNo = null;
+  await loadAll();
+  driverStage = 'sent';
+  render();
+}
+function screenDriverSent() {
+  const r = lastInvoiceResult || {};
+  let note = '';
+  if (!r.success) note = '<p class="warn">' + escapeHtml(r.error || 'Something went wrong reaching the backend.') + '</p>';
+  else if (!r.emailSent) note = '<p class="warn">' + escapeHtml(r.error || 'Saved, but not emailed.') + '</p>';
+  const heading = (r.wasEdit ? 'Invoice updated' : 'Invoice submitted') + (r.invoiceNumber ? ' — ' + escapeHtml(r.invoiceNumber) : '');
+  const actionLabel = r.wasEdit ? 'Done' : 'Submit another invoice';
+  return shell('sentBack', 'Switch driver', 'Driver Portal', '<div class="narrow center">' +
+    '<div class="check-circle">✓</div><div class="big mb-sm">' + heading + '</div>' +
+    '<p class="muted mb">Sent to operations for ' + escapeHtml(authedDriver.name) + ', ' + periodStart + ' to ' + periodEnd + '.</p>' +
+    note + '<button class="btn-primary" id="submitAnotherBtn">' + actionLabel + '</button></div>');
+}
+function wireDriverSent() {
+  document.getElementById('sentBack').onclick = () => exitDriverFlow();
+  document.getElementById('submitAnotherBtn').onclick = () => {
+    if (lastInvoiceResult && lastInvoiceResult.wasEdit) { exitDriverFlow(); return; }
+    driverStage = 'entry'; periodStart = defStart(); periodEnd = defEnd(); loads = [emptyLoad()]; driverTab = 'new'; render();
+  };
+}
+
+// ===================== DRIVER HISTORY =====================
+function historyListHtml() {
+  const mine = DATA.invoices.filter(inv => inv.driverId === authedDriver.id);
+  if (mine.length === 0) return '<div class="empty-note">No invoices submitted yet.</div>';
+  return '<div class="stack">' + mine.map(inv => invoiceCardHtml(inv, false)).join('') + '</div>';
+}
+function invoiceCardHtml(inv, showDriverName) {
+  const rows = inv.loads.map(l =>
+    '<tr><td>' + l.date + '</td><td class="mono">' + l.refType + '#' + l.refNumber + '</td><td>' + escapeHtml(l.pickup) + '</td><td>' + escapeHtml(l.dropoffsText) + '</td>' +
+    '<td class="right">' + money(l.price) + '</td><td class="right">-' + money(l.commission) + '</td><td class="right">+' + money(l.tax) + '</td><td class="right bold">' + money(l.pay) + '</td></tr>'
+  ).join('');
+  return '<details class="invoice-card"><summary>' +
+    '<div><div class="bold">' + (inv.invoiceNumber ? escapeHtml(inv.invoiceNumber) + ' · ' : '') + (showDriverName ? escapeHtml(inv.driverName) + (inv.company ? ' (' + escapeHtml(inv.company) + ')' : '') + ' · ' : '') + inv.periodStart + ' – ' + inv.periodEnd + '</div>' +
+    '<div class="fine-print">' + inv.loads.length + ' loads · submitted ' + new Date(inv.submittedAt).toLocaleString() + ' · ' + (inv.emailed ? 'Emailed' : 'Not emailed') + '</div></div>' +
+    '<div class="text-right"><div class="fine-print">' + (showDriverName ? 'Driver pay' : 'Pay') + '</div><div class="bold">' + money(inv.totals.pay) + '</div></div>' +
+    '</summary><div class="table-wrap mt-sm"><table class="data-table small"><thead><tr><th>Date</th><th>Ref</th><th>Pickup</th><th>Drop-off(s)</th><th class="right">Actual</th><th class="right">Comm.</th><th class="right">Tax</th><th class="right">Pay</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    (inv.editedAt ? '<div class="fine-print mt-sm">Last edited ' + new Date(inv.editedAt).toLocaleString() + '</div>' : '') +
+    '<div class="mt-sm flex-row gap">' +
+    (inv.pdfUrl ? '<a href="' + inv.pdfUrl + '" target="_blank" rel="noopener" class="link-btn-sm">📄 View PDF</a>' : '') +
+    '<button type="button" class="link-btn-sm edit-invoice-btn" data-id="' + inv.id + '">✎ Edit</button>' +
+    '</div>' +
+    '</details>';
+}
+
+// ===================== OPS LOGIN =====================
+function screenOpsLogin() {
+  return shell('backHome2', 'Home', 'Operations Portal', '<div class="narrow center">' +
+    '<div class="lock-icon">🔒</div><div class="hint">Enter operations PIN</div>' +
+    '<input type="password" inputmode="numeric" id="opsPinInput" class="input pin-input mb-sm" placeholder="••••">' +
+    '<div class="err-text" id="opsPinErr">Incorrect PIN</div>' +
+    '<button class="btn-primary full" id="opsLoginBtn">Unlock</button>' +
+    '<p class="fine-print mt-sm">Default PIN is 1234 until changed in Settings.</p></div>');
+}
+function wireOpsLogin() {
+  document.getElementById('backHome2').onclick = () => { VIEW = 'home'; render(); };
+  document.getElementById('opsLoginBtn').onclick = () => {
+    const pin = document.getElementById('opsPinInput').value;
+    if (pin === DATA.settings.opsPin) { opsAuthed = true; opsTab = 'invoices'; VIEW = 'opsApp'; render(); }
+    else { document.getElementById('opsPinErr').style.display = 'block'; }
+  };
+}
+
+// ===================== OPS APP =====================
+function screenOpsApp() {
+  const nav = '<nav class="ops-nav">' +
+    '<button class="nav-tab ' + (opsTab === 'invoices' ? 'active' : '') + '" id="navInvoices">📄 Invoices</button>' +
+    '<button class="nav-tab ' + (opsTab === 'drivers' ? 'active' : '') + '" id="navDrivers">👥 Drivers</button>' +
+    '<button class="nav-tab ' + (opsTab === 'settings' ? 'active' : '') + '" id="navSettings">⚙️ Settings</button></nav>';
+  const body = opsTab === 'invoices' ? opsInvoicesHtml() : opsTab === 'drivers' ? opsDriversHtml() : opsSettingsHtml();
+  return '<div class="shell"><header class="shell-header row-between">' +
+    '<div class="flex-row gap"><button class="link-btn" id="opsHome">← Home</button><div class="divider"></div><div class="shell-title">Operations Portal</div></div>' +
+    '<button class="link-btn danger" id="opsLock">🔒 Lock</button></header>' + nav + '<main>' + body + '</main></div>';
+}
+function wireOpsApp() {
+  document.getElementById('opsHome').onclick = () => { opsAuthed = false; VIEW = 'home'; render(); };
+  document.getElementById('opsLock').onclick = () => { opsAuthed = false; VIEW = 'opsLogin'; render(); };
+  document.getElementById('navInvoices').onclick = () => { opsTab = 'invoices'; render(); };
+  document.getElementById('navDrivers').onclick = () => { opsTab = 'drivers'; render(); };
+  document.getElementById('navSettings').onclick = () => { opsTab = 'settings'; render(); };
+  if (opsTab === 'invoices') wireOpsInvoices();
+  else if (opsTab === 'drivers') wireOpsDrivers();
+  else wireOpsSettings();
+}
+
+function opsInvoicesHtml() {
+  const options = DATA.drivers.map(d => '<option value="' + d.id + '">' + escapeHtml(d.name) + '</option>').join('');
+  const filtered = opsInvoiceFilter === 'all' ? DATA.invoices : DATA.invoices.filter(inv => inv.driverId === opsInvoiceFilter);
+  const list = filtered.length === 0 ? '<div class="empty-note">No invoices yet.</div>' : '<div class="stack">' + filtered.map(inv => invoiceCardHtml(inv, true)).join('') + '</div>';
+  return '<div class="row-between wrap mb"><select id="opsDriverFilter" class="input auto"><option value="all">All drivers</option>' + options + '</select>' +
+    '<button class="btn-success" id="downloadMasterBtn" ' + (DATA.invoices.length === 0 ? 'disabled' : '') + '>⬇ Download master workbook</button></div>' + list;
+}
+function wireOpsInvoices() {
+  const sel = document.getElementById('opsDriverFilter'); sel.value = opsInvoiceFilter;
+  sel.onchange = () => { opsInvoiceFilter = sel.value; render(); };
+  const btn = document.getElementById('downloadMasterBtn');
+  if (btn) btn.onclick = downloadMasterWorkbook;
+  wireInvoiceCards(true);
+}
+function downloadMasterWorkbook() {
+  const loadRows = [];
+  DATA.invoices.forEach(inv => {
+    inv.loads.forEach(l => {
+      loadRows.push({
+        'Invoice #': inv.invoiceNumber || '', 'Invoice ID': inv.id, 'Driver': inv.driverName, 'Company': inv.company || '',
+        'Period Start': inv.periodStart, 'Period End': inv.periodEnd,
+        'Load Date': l.date, 'Ref Type': l.refType, 'Ref Number': l.refNumber, 'Pickup': l.pickup, 'Drop-off(s)': l.dropoffsText,
+        'Province': l.province, 'Actual Amount': l.price, 'Commission %': l.commissionPct, 'Commission Amount': Number((l.commission || 0).toFixed(2)),
+        'Net After Commission': Number((l.net || 0).toFixed(2)), 'Tax Rate': l.rate, 'Tax Amount': Number((l.tax || 0).toFixed(2)),
+        'Driver Pay': Number((l.pay || 0).toFixed(2)), 'Submitted At': inv.submittedAt, 'Emailed': inv.emailed ? 'Yes' : 'No'
+      });
+    });
+  });
+  const summaryRows = DATA.invoices.map(inv => ({
+    'Invoice #': inv.invoiceNumber || '', 'Invoice ID': inv.id, 'Driver': inv.driverName, 'Company': inv.company || '',
+    'Period Start': inv.periodStart, 'Period End': inv.periodEnd,
+    'Loads': inv.loads.length, 'Actual Total': inv.totals.actual, 'Commission Total': inv.totals.commission,
+    'Net Total': inv.totals.net, 'Tax Total': inv.totals.tax, 'Driver Pay Total': inv.totals.pay,
+    'Submitted At': inv.submittedAt, 'Emailed': inv.emailed ? 'Yes' : 'No', 'PDF Link': inv.pdfUrl || ''
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Invoice Summary');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(loadRows), 'All Loads');
+  XLSX.writeFile(wb, 'KNT-Invoices-Master-' + toISO(new Date()) + '.xlsx');
+}
+
+function opsDriversHtml() {
+  const rows = DATA.drivers.map(d =>
+    '<div class="driver-row"><div class="flex-row gap"><span class="dot ' + (d.active !== false ? 'green' : 'gray') + '"></span>' +
+    '<div><div>' + escapeHtml(d.name) + '</div>' + (d.email ? '<div class="fine-print">' + escapeHtml(d.email) + '</div>' : '') +
+    '<input type="text" class="company-edit" data-id="' + d.id + '" value="' + escapeHtml(d.company || '') + '" placeholder="Company name" style="border:1.5px solid var(--line-strong);border-radius:7px;padding:4px 8px;font-size:12.5px;margin-top:4px;width:180px;"></div></div>' +
+    '<div class="flex-row gap small">' +
+    '<div class="flex-row" style="gap:2px;"><input type="text" class="commission-edit mono" data-id="' + d.id + '" value="' + escapeHtml(d.commission !== undefined ? d.commission : 20) + '" maxlength="4" inputmode="decimal" style="width:42px;text-align:center;border:1.5px solid var(--line-strong);border-radius:7px;padding:5px 4px;font-size:13px;"><span class="fine-print">%</span></div>' +
+    '<input type="password" class="pin-edit mono" data-id="' + d.id + '" value="' + escapeHtml(d.pin) + '" maxlength="4" inputmode="numeric">' +
+    '<button class="icon-btn toggle-pin" data-id="' + d.id + '" title="Show/hide">👁</button>' +
+    '<button class="icon-btn regen-pin" data-id="' + d.id + '" title="Random new PIN">🔄</button>' +
+    '<button class="link-btn-sm toggle-active" data-id="' + d.id + '">' + (d.active !== false ? 'Deactivate' : 'Activate') + '</button>' +
+    '<button class="link-btn-sm danger remove-driver" data-id="' + d.id + '">Remove</button></div></div>'
+  ).join('');
+  return '<div class="wide"><div class="grid3 mb-sm">' +
+    '<input class="input" id="newDriverName" placeholder="Driver full name">' +
+    '<input class="input" id="newDriverCompany" placeholder="Company name (optional)">' +
+    '<input class="input" id="newDriverEmail" placeholder="Driver email (required)"></div>' +
+    '<div class="grid2 mb-sm">' +
+    '<input class="input mono" id="newDriverPin" placeholder="PIN (optional)" maxlength="4" inputmode="numeric">' +
+    '<input class="input mono" id="newDriverCommission" placeholder="Commission % (default 20)" maxlength="4" inputmode="decimal"></div>' +
+    '<button class="btn-primary" id="addDriverBtn">+ Add driver</button>' +
+    '<p class="fine-print mt-sm mb">Leave PIN blank to auto-generate one, and commission blank for the 20% default — both are editable any time below, per driver. Company name is what shows on each driver\'s invoices.</p>' +
+    (DATA.drivers.length === 0 ? '<div class="empty-note">No drivers added yet.</div>' : '<div class="stack">' + rows + '</div>') + '</div>';
+}
+function wireOpsDrivers() {
+  document.getElementById('addDriverBtn').onclick = async () => {
+    const name = document.getElementById('newDriverName').value.trim();
+    if (!name) { toast('Enter a driver name first', 'error'); return; }
+    const email = document.getElementById('newDriverEmail').value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Enter a valid email for this driver — it\'s required', 'error'); return; }
+    const company = document.getElementById('newDriverCompany').value.trim();
+    const pinRaw = document.getElementById('newDriverPin').value.trim();
+    const pin = pinRaw ? pinRaw.padStart(4, '0') : generatePin();
+    const commissionRaw = document.getElementById('newDriverCommission').value.trim();
+    const commission = commissionRaw ? Number(commissionRaw) : 20;
+    const ok = await performAction({ action: 'addDriver', name: name, company: company, email: email, pin: pin, commission: commission }, 'Driver added');
+    if (ok) { await loadAll(); render(); }
+  };
+  document.querySelectorAll('.company-edit').forEach(inp => {
+    inp.onchange = async () => {
+      const ok = await performAction({ action: 'updateDriver', id: inp.dataset.id, company: inp.value.trim() }, 'Company updated');
+      if (ok) { await loadAll(); render(); }
+    };
+  });
+  document.querySelectorAll('.commission-edit').forEach(inp => {
+    inp.onchange = async () => {
+      let v = parseFloat(inp.value);
+      if (isNaN(v) || v < 0) v = 20;
+      if (v > 100) v = 100;
+      inp.value = v;
+      const ok = await performAction({ action: 'updateDriver', id: inp.dataset.id, commission: v }, 'Commission updated');
+      if (ok) { await loadAll(); render(); }
+    };
+  });
+  document.querySelectorAll('.pin-edit').forEach(inp => {
+    inp.onchange = async () => {
+      const v = inp.value.replace(/\D/g, '').slice(0, 4);
+      inp.value = v;
+      const ok = await performAction({ action: 'updateDriver', id: inp.dataset.id, pin: v }, 'PIN updated');
+      if (ok) { await loadAll(); render(); }
+    };
+  });
+  document.querySelectorAll('.toggle-pin').forEach(btn => {
+    btn.onclick = () => { const inp = document.querySelector('.pin-edit[data-id="' + btn.dataset.id + '"]'); inp.type = inp.type === 'password' ? 'text' : 'password'; };
+  });
+  document.querySelectorAll('.regen-pin').forEach(btn => {
+    btn.onclick = async () => { const ok = await performAction({ action: 'updateDriver', id: btn.dataset.id, pin: generatePin() }, 'PIN updated'); if (ok) { await loadAll(); render(); } };
+  });
+  document.querySelectorAll('.toggle-active').forEach(btn => {
+    btn.onclick = async () => {
+      const d = DATA.drivers.find(x => x.id === btn.dataset.id);
+      const ok = await performAction({ action: 'updateDriver', id: btn.dataset.id, active: !(d.active !== false) });
+      if (ok) { await loadAll(); render(); }
+    };
+  });
+  document.querySelectorAll('.remove-driver').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('Remove this driver? This cannot be undone.')) return;
+      const ok = await performAction({ action: 'removeDriver', id: btn.dataset.id }, 'Driver removed');
+      if (ok) { await loadAll(); render(); }
+    };
+  });
+}
+
+function opsSettingsHtml() {
+  return '<div class="narrow"><label class="field-label">Tax is calculated on</label>' +
+    '<select id="taxBasisSelect" class="input mb">' +
+    '<option value="net" ' + (DATA.settings.taxBasis === 'net' ? 'selected' : '') + '>Net amount after each driver\'s commission (default)</option>' +
+    '<option value="gross" ' + (DATA.settings.taxBasis === 'gross' ? 'selected' : '') + '>Actual (gross) load amount</option></select>' +
+    '<div class="divider-h"></div>' +
+    '<label class="field-label">New operations PIN</label>' +
+    '<input class="input mono mb" id="newOpsPin" placeholder="current: ' + DATA.settings.opsPin + '" maxlength="8">' +
+    '<p class="fine-print mb">Leave blank to keep the current PIN.</p>' +
+    '<button class="btn-primary" id="saveSettingsBtn">Save settings</button> <span class="fine-print success" id="settingsSaved" style="display:none;">Saved</span></div>';
+}
+function wireOpsSettings() {
+  document.getElementById('taxBasisSelect').onchange = async (e) => {
+    const ok = await performAction({ action: 'updateSettings', taxBasis: e.target.value }, 'Tax setting saved');
+    if (ok) await loadAll();
+  };
+  document.getElementById('saveSettingsBtn').onclick = async () => {
+    const newPin = document.getElementById('newOpsPin').value.trim();
+    const payload = { action: 'updateSettings' };
+    if (newPin) payload.opsPin = newPin;
+    const ok = await performAction(payload);
+    if (!ok) return;
+    await loadAll();
+    document.getElementById('newOpsPin').value = '';
+    const s = document.getElementById('settingsSaved'); s.style.display = 'inline'; setTimeout(() => s.style.display = 'none', 2000);
+  };
+}
+
+// ===================== BOOT =====================
+let dataLoaded = false;
+
+async function boot() {
+  if (!apiConfigured()) { document.getElementById('apiWarning').style.display = 'block'; }
+  render();
+  await loadAll();
+  dataLoaded = true;
+}
+boot();
+
+})();
+</script>
+</body>
+</html>
