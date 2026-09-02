@@ -357,6 +357,7 @@ async function apiPost(payload) {
 // Shared in-flight promise so multiple triggers (e.g. tapping both portal
 // cards before the first load finishes) reuse one request instead of
 // firing duplicate fetches.
+const CACHE_KEY = 'knt_invoicing_cache_v1';
 let loadAllPromise = null;
 async function loadAll() {
   if (!apiConfigured()) return;
@@ -368,6 +369,7 @@ async function loadAll() {
         DATA.drivers = data.drivers || [];
         DATA.invoices = data.invoices || [];
         DATA.settings = Object.assign({ opsPin: '1234', taxBasis: 'net' }, data.settings || {});
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(DATA)); } catch (e) { /* storage unavailable — fine, just skip caching */ }
       } else if (data && !data.success) {
         toast(data.message || 'The backend returned an error while loading data', 'error');
       }
@@ -512,9 +514,12 @@ function wireDriverLogin() {
   document.getElementById('backHome1').onclick = () => { VIEW = 'home'; render(); };
   const btn = document.getElementById('driverLoginBtn');
   if (!btn) return;
-  btn.onclick = () => {
+  btn.onclick = async () => {
     const id = document.getElementById('driverSelect').value;
     const pin = document.getElementById('driverPinInput').value;
+    btn.disabled = true; btn.textContent = 'Checking…';
+    await loadAll(); // always verify against the current PIN, never a stale cached one
+    btn.disabled = false; btn.textContent = 'Unlock';
     const d = DATA.drivers.find(x => x.id === id);
     if (d && String(d.pin) === pin) {
       authedDriver = d; driverTab = 'new'; driverStage = 'entry';
@@ -728,13 +733,16 @@ function screenOpsLogin() {
     '<div class="lock-icon">🔒</div><div class="hint">Enter operations PIN</div>' +
     '<input type="password" inputmode="numeric" id="opsPinInput" class="input pin-input mb-sm" placeholder="••••">' +
     '<div class="err-text" id="opsPinErr">Incorrect PIN</div>' +
-    '<button class="btn-primary full" id="opsLoginBtn">Unlock</button>' +
-    '<p class="fine-print mt-sm">Default PIN is 1234 until changed in Settings.</p></div>');
+    '<button class="btn-primary full" id="opsLoginBtn">Unlock</button></div>');
 }
 function wireOpsLogin() {
   document.getElementById('backHome2').onclick = () => { VIEW = 'home'; render(); };
-  document.getElementById('opsLoginBtn').onclick = () => {
+  document.getElementById('opsLoginBtn').onclick = async () => {
     const pin = document.getElementById('opsPinInput').value;
+    const btn = document.getElementById('opsLoginBtn');
+    btn.disabled = true; btn.textContent = 'Checking…';
+    await loadAll(); // always verify against the current PIN, never a stale cached one
+    btn.disabled = false; btn.textContent = 'Unlock';
     if (pin === DATA.settings.opsPin) { opsAuthed = true; opsTab = 'invoices'; VIEW = 'opsApp'; render(); }
     else { document.getElementById('opsPinErr').style.display = 'block'; }
   };
@@ -920,9 +928,26 @@ let dataLoaded = false;
 
 async function boot() {
   if (!apiConfigured()) { document.getElementById('apiWarning').style.display = 'block'; }
+  // Show cached data instantly if we have it from a previous visit, so
+  // portals open right away instead of waiting on a fresh Apps Script
+  // request every single time. Login screens still always re-check PINs
+  // against a fresh fetch (see wireDriverLogin/wireOpsLogin), so this
+  // cache never affects who can actually get in — only how fast the
+  // driver list / invoice list appear on screen.
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      DATA.drivers = parsed.drivers || [];
+      DATA.invoices = parsed.invoices || [];
+      DATA.settings = Object.assign({ opsPin: '1234', taxBasis: 'net' }, parsed.settings || {});
+      dataLoaded = true;
+    }
+  } catch (e) { /* corrupt or unavailable cache — ignore, fall back to a real fetch */ }
   render();
   await loadAll();
   dataLoaded = true;
+  if (VIEW !== 'home') render(); // refresh whatever's currently showing with the fresh data
 }
 boot();
 
